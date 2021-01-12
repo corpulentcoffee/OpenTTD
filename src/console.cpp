@@ -361,7 +361,45 @@ static void IConsoleAliasExec(const IConsoleAlias *alias, byte tokencount, char 
 						alias_stream = strecpy(alias_stream, "\"", lastof(alias_buffer));
 						for (uint i = 0; i != tokencount; i++) {
 							if (i != 0) alias_stream = strecpy(alias_stream, " ", lastof(alias_buffer));
+
+							// WIP notes
+							//
+							// This fix would allow an alias like
+							//     alias pi "rcon Password123 %!"
+							// to properly handle a command like
+							//     pi say "Hello World!"
+							// where "Hello World!" is a single token but without this fix
+							// will get built into alias_stream in an unquoted form.
+							//
+							// - Am I missing something obvious about why this isn't already
+							//   handled by the status quo?
+							// - Could existing use cases of %! aliases be broken by this?
+							// - Would it be safer for this quoting behavior to be available
+							//   as %* (or another symbol) instead? If so, need_inner_quotes
+							//   checking could probably be skipped and wrapping the tokens
+							//   could be unconditional.
+							// - This doesn't handle tokens with other weird characters that
+							//   might need escaping, like quotes or slashes; do they need
+							//   special handling? Does even IConsoleCmdExec() handle those
+							//   characters when they are nested?
+							// - Is there anything in string_func or other places to make this
+							//   cleaner?
+
+							bool need_inner_quotes = false;
+							for (char* tokenptr = tokens[i]; *tokenptr != '\0'; tokenptr++) {
+								if (isspace(*tokenptr)) {
+									need_inner_quotes = true;
+									break;
+								}
+							}
+
+							if (need_inner_quotes) {
+								alias_stream = strecpy(alias_stream, "\\\"", lastof(alias_buffer));
+							}
 							alias_stream = strecpy(alias_stream, tokens[i], lastof(alias_buffer));
+							if (need_inner_quotes) {
+								alias_stream = strecpy(alias_stream, "\\\"", lastof(alias_buffer));
+							}
 						}
 						alias_stream = strecpy(alias_stream, "\"", lastof(alias_buffer));
 						break;
